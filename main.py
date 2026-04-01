@@ -22,7 +22,7 @@ def main():
     app.setApplicationVersion("1.0")
 
     pencere = AnaWindow()
-    pencere.show()
+    pencere.showMaximized()
 
     sys.exit(app.exec_())
 

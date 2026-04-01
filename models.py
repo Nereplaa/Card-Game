@@ -236,6 +236,12 @@ class Sporcu(ABC):
     def kritik_enerji_mi(self) -> bool:
         return 0 < self._enerji < 20
 
+    # --- Başlangıç değeri atama ---
+    def baslangic_ayarla(self, enerji: int, moral: int):
+        """Oyun başında rastgele başlangıç değerleri ata"""
+        self._enerji = max(0, min(self._max_enerji, enerji))
+        self._moral = max(0, min(100, moral))
+
     # --- Enerji yönetimi ---
     def enerji_guncelle(self, miktar: int, veteran_bonus: bool = False):
         """Veteran pasifi aktifse kaybı %50 azalt"""

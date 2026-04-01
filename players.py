@@ -218,7 +218,7 @@ class Bilgisayar(Oyuncu):
     ):
         super().__init__(oyuncu_id, oyuncu_adi)
         self._strateji = strateji
-        self._kartlar_goster: bool = False
+        self._kartlar_goster: bool = True
 
     @property
     def strateji(self) -> "KartSecmeStratejisi":

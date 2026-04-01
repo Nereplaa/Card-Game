@@ -460,7 +460,7 @@ class BransGostergesi(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(95)
+        self.setFixedHeight(125)
         self._build()
         self._brans_gizle()
 
@@ -504,7 +504,19 @@ class BransGostergesi(QFrame):
         )
         lay.addWidget(self._alt_lb)
 
-    def guncelle(self, brans: Optional[Brans], tur_no: int = 0):
+        # Oynanacak özellik etiketi
+        self._ozellik_lb = QLabel("")
+        self._ozellik_lb.setAlignment(Qt.AlignCenter)
+        f2 = QFont("Segoe UI", 11)
+        f2.setBold(True)
+        self._ozellik_lb.setFont(f2)
+        self._ozellik_lb.setStyleSheet(
+            f"color: {RENKLER['altin']}; font-size: 12px; "
+            f"background: transparent; border: none;"
+        )
+        lay.addWidget(self._ozellik_lb)
+
+    def guncelle(self, brans: Optional[Brans], tur_no: int = 0, ozellik: str = ""):
         if brans is None:
             self._brans_gizle()
             return
@@ -523,11 +535,14 @@ class BransGostergesi(QFrame):
         """)
         self._ana_lb.setText(f"{ikon}  {ad}")
         self._ana_lb.setStyleSheet(
-            f"color: {renk}; background: transparent; border: none; "
-            f"text-shadow: 0 0 20px {renk};"
+            f"color: {renk}; background: transparent; border: none;"
         )
         self._etiket.setText(f"TUR {tur_no}  ·  BRANŞ SEÇİMİ")
         self._alt_lb.setText("Aşağıdan kartınızı seçin ve turu oynayın")
+        if ozellik:
+            self._ozellik_lb.setText(f"⚡ Bu turda karşılaştırılacak özellik: {ozellik}")
+        else:
+            self._ozellik_lb.setText("")
         self.show()
 
     def _brans_gizle(self):
@@ -536,6 +551,7 @@ class BransGostergesi(QFrame):
                                    f"background: transparent; border: none;")
         self._etiket.setText("BRANŞ BEKLENİYOR")
         self._alt_lb.setText("")
+        self._ozellik_lb.setText("")
         self.setStyleSheet(f"""
             QFrame {{
                 background: {RENKLER["bg_panel"]};
@@ -745,7 +761,7 @@ class OrtaPanel(QWidget):
 
         self._karsi_text = QTextEdit()
         self._karsi_text.setReadOnly(True)
-        self._karsi_text.setMinimumHeight(145)
+        self._karsi_text.setMinimumHeight(220)
         self._karsi_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._karsi_text.setStyleSheet(
             f"background: {RENKLER['bg_card']}; color: #CCCCEE; "
@@ -810,8 +826,6 @@ class OrtaPanel(QWidget):
         self._btn_tur.setEnabled(False)
         lay.addWidget(self._btn_tur)
 
-        lay.addStretch()
-
     # ── Yardımcı ──────────────────────────────────────────────────────────
     @staticmethod
     def _make_moral_bar(renk: str) -> QProgressBar:
@@ -838,8 +852,8 @@ class OrtaPanel(QWidget):
     def tur_bilgisi_guncelle(self, metin: str):
         self._tur_bilgi_lb.setText(metin)
 
-    def brans_guncelle(self, brans: Optional[Brans], tur_no: int = 0):
-        self._brans_gostergesi.guncelle(brans, tur_no)
+    def brans_guncelle(self, brans: Optional[Brans], tur_no: int = 0, ozellik: str = ""):
+        self._brans_gostergesi.guncelle(brans, tur_no, ozellik)
 
     def karsilastirma_goster(self, metin: str):
         self._karsi_text.setText(metin)
@@ -879,20 +893,20 @@ class HosgeldinEkrani(QWidget):
         # ── Başlık ────────────────────────────────────────────────────────
         baslik = QLabel("AKILLI SPORCU\nKART LİGİ")
         baslik.setAlignment(Qt.AlignCenter)
-        f = QFont("Segoe UI", 30)
+        f = QFont("Segoe UI", 36)
         f.setBold(True)
         baslik.setFont(f)
         baslik.setStyleSheet(
             f"color: {RENKLER['accent']}; "
-            f"background: transparent; border: none; line-height: 1.2;"
+            f"background: transparent; border: none;"
         )
         lay.addWidget(baslik)
 
         alt = QLabel("SİMÜLASYON  v2.0")
         alt.setAlignment(Qt.AlignCenter)
         alt.setStyleSheet(
-            f"color: {RENKLER['text_secondary']}; font-size: 13px; "
-            f"letter-spacing: 4px; background: transparent; border: none;"
+            f"color: {RENKLER['accent']}88; font-size: 14px; "
+            f"letter-spacing: 6px; background: transparent; border: none; font-weight: bold;"
         )
         lay.addWidget(alt)
 
@@ -907,8 +921,8 @@ class HosgeldinEkrani(QWidget):
         zorluk_lb = QLabel("ZORLUK SEVİYESİ SEÇİN")
         zorluk_lb.setAlignment(Qt.AlignCenter)
         zorluk_lb.setStyleSheet(
-            f"color: {RENKLER['text_secondary']}; font-size: 13px; "
-            f"letter-spacing: 3px; background: transparent; border: none;"
+            f"color: {RENKLER['text_primary']}; font-size: 15px; font-weight: bold; "
+            f"letter-spacing: 4px; background: transparent; border: none;"
         )
         lay.addWidget(zorluk_lb)
 
@@ -959,21 +973,24 @@ class HosgeldinEkrani(QWidget):
     @staticmethod
     def _make_btn(metin: str, renk: str, hover_renk: str) -> QPushButton:
         btn = QPushButton(metin)
-        btn.setMinimumSize(170, 58)
+        btn.setMinimumSize(190, 64)
         btn.setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {renk}CC, stop:1 {renk}88);
-                color: #0B0B1A; font-size: 16px; font-weight: bold;
-                border-radius: 14px; border: 2px solid {renk};
+                    stop:0 {renk}DD, stop:1 {renk}99);
+                color: #FFFFFF; font-size: 17px; font-weight: bold;
+                border-radius: 16px; border: 2px solid {renk};
+                letter-spacing: 1px;
             }}
             QPushButton:hover {{
-                background: {renk};
-                color: #0B0B1A;
-                border-color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {renk}, stop:1 {renk}CC);
+                color: #FFFFFF;
+                border: 2px solid #FFFFFF;
             }}
             QPushButton:pressed {{
                 background: {hover_renk};
+                color: #FFFFFF;
             }}
         """)
         return btn
@@ -1058,7 +1075,7 @@ class OyunEkrani(QWidget):
         )
         b_ust.addWidget(b_baslik, 1)
 
-        self._btn_goster = QPushButton("👁 Göster")
+        self._btn_goster = QPushButton("🙈 Gizle")
         self._btn_goster.setFixedWidth(90)
         self._btn_goster.setStyleSheet(
             f"background: {RENKLER['bg_panel']}; color: {RENKLER['text_secondary']}; "
@@ -1163,8 +1180,9 @@ class OyunEkrani(QWidget):
             brans = durum["brans"]
             kullanici_filtre = durum.get("kullanici_filtre", brans)
             tur_no = self._yonetici.mevcut_tur_no + 1
+            ozellik = durum.get("secilecek_ozellik", "")
 
-            self._orta_panel.brans_guncelle(brans, tur_no)
+            self._orta_panel.brans_guncelle(brans, tur_no, ozellik)
             self._orta_panel.tur_bilgisi_guncelle(durum.get("mesaj", ""))
             self._durum_lb.setText(f"Sıradaki: {brans.goster_adi()}")
             self._tur_sayisi_lb.setText(f"Tur: {tur_no}")

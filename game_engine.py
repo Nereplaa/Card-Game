@@ -11,6 +11,13 @@ from models import Sporcu, Futbolcu, Basketbolcu, Voleybolcu, Brans
 from players import Kullanici, Bilgisayar
 from strategies import KartSecmeStratejisi
 
+# Branş başına oynanabilecek özellik listesi (tur öncesi gösterim için)
+BRANS_OZELLIKLER = {
+    Brans.FUTBOL:    ["Penaltı", "SerbestVuruş", "KaleciKarşıKarşıya"],
+    Brans.BASKETBOL: ["İkilik", "Üçlük", "SerbestAtış"],
+    Brans.VOLEYBOL:  ["Servis", "Blok", "Smaç"],
+}
+
 
 # ---------------------------------------------------------------------------
 # VERİ OKUYUCU
@@ -167,6 +174,7 @@ class OyunYonetici:
         self._brans_indeks: int = 0           # sıra içindeki branş indeksi
         self._legend_kullanildi_kullanici: bool = False
         self._legend_kullanildi_bilgisayar: bool = False
+        self._onceden_secilen_ozellik: Optional[str] = None
 
     # --- Kurulum ---
     def oyunu_kur(self, kullanici: Kullanici, bilgisayar: Bilgisayar):
@@ -175,6 +183,7 @@ class OyunYonetici:
         self._mevcut_tur_no = 0
         self._brans_indeks = 0
         self._oyun_bitti = False
+        self._onceden_secilen_ozellik = None
 
     def kartlari_dagit(self, tum_sporcular: List[Sporcu]):
         """
@@ -191,6 +200,12 @@ class OyunYonetici:
 
         kullanici_kartlar = futbolar[:4] + basketlar[:4] + voleylar[:4]
         bilgisayar_kartlar = futbolar[4:] + basketlar[4:] + voleylar[4:]
+
+        # Rastgele enerji (45–100) ve moral (50–100) ata
+        for kart in kullanici_kartlar + bilgisayar_kartlar:
+            rand_enerji = random.randint(45, 100)
+            rand_moral = random.randint(50, 100)
+            kart.baslangic_ayarla(rand_enerji, rand_moral)
 
         self._kullanici.kartlari_al(kullanici_kartlar)
         self._bilgisayar.kartlari_al(bilgisayar_kartlar)
@@ -276,11 +291,17 @@ class OyunYonetici:
         if not k_brans:
             tur_mesaj += f"\n⚠ {brans.goster_adi()} kartınız kalmadı – başka branştan oynayabilirsiniz."
 
+        # Özelliği tur başında önceden belirle (GUI'de gösterim için)
+        ozellik_listesi = BRANS_OZELLIKLER.get(brans, [])
+        if ozellik_listesi:
+            self._onceden_secilen_ozellik = random.choice(ozellik_listesi)
+
         return {
             "durum": "normal",
             "brans": brans,
             "kullanici_filtre": kullanici_filtre,
             "mesaj": tur_mesaj,
+            "secilecek_ozellik": self._onceden_secilen_ozellik or "",
         }
 
     def _hukmen_isle(self, brans: Brans, kazanan: str, mesaj_sebebi: str = "") -> dict:
@@ -333,9 +354,13 @@ class OyunYonetici:
         son_3 = self.son_3_tur_mu()
         tur_no = self._mevcut_tur_no + 1
 
-        # Rastgele özellik seç
+        # Özelliği kullan (tur_baslat'ta önceden seçilmişse onu kullan)
         ozellik_listesi = kullanici_kart.get_ozellik_listesi()
-        secilen_ozellik = random.choice(ozellik_listesi)
+        if self._onceden_secilen_ozellik and self._onceden_secilen_ozellik in ozellik_listesi:
+            secilen_ozellik = self._onceden_secilen_ozellik
+        else:
+            secilen_ozellik = random.choice(ozellik_listesi)
+        self._onceden_secilen_ozellik = None
 
         # Oyun durumu sözlüğü
         oyun_durumu_k = {
