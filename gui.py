@@ -4,7 +4,10 @@ PyQt5 Arayüzü – Akıllı Sporcu Kart Ligi Simülasyonu
 Yeni Tasarım v2: Cyberpunk/Spor Karışımı Dark Tema
 Premium kart görünümü, branş banner, anlık güncelleme, bug düzeltmeleri
 """
+import os
+import re
 import sys
+import unicodedata
 from typing import Optional, List
 
 from PyQt5.QtWidgets import (
@@ -16,7 +19,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QPixmap
 
 from models import Sporcu, Brans
 from players import Kullanici, Bilgisayar
@@ -101,12 +104,42 @@ QToolTip {{
 
 # Kart minimum boyutları (sabit değil, esnek)
 KART_W = 195
-KART_H = 350
+KART_H = 410
 
 
 # ---------------------------------------------------------------------------
 # YARDIMCI FONKSİYONLAR
 # ---------------------------------------------------------------------------
+
+_PROJE_DIZIN = os.path.dirname(os.path.abspath(__file__))
+_RESIM_DIZIN = os.path.join(_PROJE_DIZIN, "images")
+
+
+def _normalize_isim(isim: str) -> str:
+    """
+    'Arda Güler' → 'arda_guler'
+    Türkçe karakterleri dönüştürür, boşlukları _ yapar, küçük harfe çevirir.
+    """
+    tr_map = str.maketrans("ıİğĞşŞöÖüÜçÇ", "iIgGsSoOuUcC")
+    isim = isim.translate(tr_map)
+    isim = unicodedata.normalize("NFD", isim)
+    isim = "".join(c for c in isim if unicodedata.category(c) != "Mn")
+    isim = isim.lower().strip().replace(" ", "_")
+    isim = re.sub(r"[^a-z0-9_]", "", isim)
+    return isim
+
+
+def _sporcu_resim_bul(sporcu_adi: str) -> Optional[str]:
+    """Sporcu adına göre images/ klasöründe .png veya .jpg dosyasını ara."""
+    if not os.path.isdir(_RESIM_DIZIN):
+        return None
+    isim = _normalize_isim(sporcu_adi)
+    for ext in (".png", ".jpg", ".jpeg"):
+        yol = os.path.join(_RESIM_DIZIN, isim + ext)
+        if os.path.exists(yol):
+            return yol
+    return None
+
 
 def _stat_renk(val: int) -> str:
     if val >= 80:
@@ -266,29 +299,40 @@ class KartWidget(QFrame):
         img_wrap_lay.setSpacing(0)
 
         img_frame = QFrame()
-        img_frame.setFixedHeight(96)
+        img_frame.setFixedHeight(150)
         img_frame.setStyleSheet(f"""
             QFrame {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 #07071A, stop:0.5 #0D0D26, stop:1 #07071A);
-                border: 1px dashed {br}70;
+                border: 1px solid {br}55;
                 border-radius: 7px;
             }}
         """)
         img_inner = QVBoxLayout(img_frame)
+        img_inner.setContentsMargins(0, 0, 0, 0)
         img_inner.setAlignment(Qt.AlignCenter)
-        img_inner.setSpacing(2)
+        img_inner.setSpacing(0)
 
-        cam_lb = QLabel("📷")
-        cam_lb.setAlignment(Qt.AlignCenter)
-        cam_lb.setStyleSheet("font-size: 22px; background: transparent; border: none;")
-        img_inner.addWidget(cam_lb)
-
-        res_lb = QLabel("Resim Alanı")
-        res_lb.setAlignment(Qt.AlignCenter)
-        res_lb.setStyleSheet(f"color: {br}55; font-size: 10px; letter-spacing: 1px; "
-                             f"background: transparent; border: none;")
-        img_inner.addWidget(res_lb)
+        resim_yolu = _sporcu_resim_bul(self._sporcu.sporcu_adi)
+        if resim_yolu:
+            pixmap = QPixmap(resim_yolu).scaled(
+                181, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            resim_lb = QLabel()
+            resim_lb.setAlignment(Qt.AlignCenter)
+            resim_lb.setPixmap(pixmap)
+            resim_lb.setStyleSheet("background: transparent; border: none;")
+            img_inner.addWidget(resim_lb)
+        else:
+            cam_lb = QLabel("📷")
+            cam_lb.setAlignment(Qt.AlignCenter)
+            cam_lb.setStyleSheet("font-size: 26px; background: transparent; border: none;")
+            img_inner.addWidget(cam_lb)
+            res_lb = QLabel(_normalize_isim(self._sporcu.sporcu_adi) + ".png")
+            res_lb.setAlignment(Qt.AlignCenter)
+            res_lb.setStyleSheet(f"color: {br}66; font-size: 9px; letter-spacing: 1px; "
+                                 f"background: transparent; border: none;")
+            img_inner.addWidget(res_lb)
 
         img_wrap_lay.addWidget(img_frame)
         lay.addWidget(img_wrap)
