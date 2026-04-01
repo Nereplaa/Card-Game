@@ -261,8 +261,9 @@ class Sporcu(ABC):
         self._kart_kullanildi_mi = True
 
     def beraberlik_kaydet(self):
+        # Beraberlikte kart "kullanıldı" sayılmaz – elde kalır ve tekrar oynanabilir
         self._kullanim_sayisi += 1
-        self._kart_kullanildi_mi = True
+        # kart_kullanildi_mi = False kalır (kural: kartlar elde kalır)
         self._deneyim_puani += 1
         self._seviye_kontrol()
 

@@ -223,25 +223,40 @@ class OyunYonetici:
     def tur_baslat(self) -> dict:
         """
         Sıradaki turun durumunu belirle.
-        Döner: { 'durum': ..., 'brans': Brans, 'mesaj': str }
+        Döner: { 'durum': ..., 'brans': Brans, 'mesaj': str, 'kullanici_filtre': Brans|None }
         Durum: 'normal' | 'hukmen_kullanici' | 'hukmen_bilgisayar' | 'atla' | 'oyun_bitti'
+
+        Kural:
+          - Hükmen sadece ELİ TAMAMEN BOŞ olan oyuncuya karşı uygulanır.
+          - Sadece branş kartı yoksa ama diğer kartları varsa → o oyuncu başka branştan oynayabilir.
+          - Her iki oyuncunun da bu branşa ait kartı yoksa tur atlanır.
         """
         if self._oyun_bitti:
             return {"durum": "oyun_bitti", "brans": None, "mesaj": "Oyun sona erdi."}
 
-        # Oynanabilir kart kaldı mı?
-        k_kartlar = self._kullanici.get_oynanabilir_kartlar()
-        b_kartlar = self._bilgisayar.get_oynanabilir_kartlar()
+        brans = self.mevcut_brans()
 
-        if not k_kartlar and not b_kartlar:
+        # Toplam oynanabilir kart kontrolü (hükmen için)
+        k_tum = self._kullanici.get_oynanabilir_kartlar()
+        b_tum = self._bilgisayar.get_oynanabilir_kartlar()
+
+        if not k_tum and not b_tum:
             self._oyun_bitti = True
             return {"durum": "oyun_bitti", "brans": None, "mesaj": "Her iki oyuncunun da kartı kalmadı."}
 
-        brans = self.mevcut_brans()
+        # Hükmen: elin tamamen boşsa (branştan bağımsız)
+        if not k_tum and b_tum:
+            return self._hukmen_isle(brans, kazanan="bilgisayar",
+                                     mesaj_sebebi="kullanıcının hiç kartı kalmadı")
+        if k_tum and not b_tum:
+            return self._hukmen_isle(brans, kazanan="kullanici",
+                                     mesaj_sebebi="bilgisayarın hiç kartı kalmadı")
+
+        # Branşa ait kart kontrolü
         k_brans = self._kullanici.get_brans_kartlari(brans)
         b_brans = self._bilgisayar.get_brans_kartlari(brans)
 
-        # Her iki oyuncuda da bu branşta kart yoksa: atla
+        # Her iki oyuncuda da bu branşta kart yoksa: tur atlanır
         if not k_brans and not b_brans:
             self._istatistik.atlanan_tur_kaydet()
             self._brans_indeks += 1
@@ -252,38 +267,37 @@ class OyunYonetici:
                 "mesaj": f"Her iki oyuncuda da {brans.goster_adi()} kartı kalmadı. Tur atlandı.",
             }
 
-        # Sadece kullanıcıda yoksa: bilgisayar hükmen kazanır
-        if not k_brans and b_brans:
-            sonuc = self._hukmen_isle(brans, kazanan="bilgisayar")
-            return sonuc
+        # Normal oyun:
+        # Eğer oyuncunun bu branşa ait kartı yoksa diğer kartlarından seçebilir
+        # kullanici_filtre: None → tüm kartları göster, Brans → sadece branş kartlarını göster
+        kullanici_filtre = brans if k_brans else None
 
-        # Sadece bilgisayarda yoksa: kullanıcı hükmen kazanır
-        if k_brans and not b_brans:
-            sonuc = self._hukmen_isle(brans, kazanan="kullanici")
-            return sonuc
+        tur_mesaj = f"Tur {self._mevcut_tur_no + 1} – {brans.goster_adi()} branşı"
+        if not k_brans:
+            tur_mesaj += f"\n⚠ {brans.goster_adi()} kartınız kalmadı – başka branştan oynayabilirsiniz."
 
-        # Normal oyun: kullanıcıdan kart seçmesi bekleniyor
         return {
             "durum": "normal",
             "brans": brans,
-            "mesaj": f"Tur {self._mevcut_tur_no + 1} – {brans.goster_adi()} branşı",
+            "kullanici_filtre": kullanici_filtre,
+            "mesaj": tur_mesaj,
         }
 
-    def _hukmen_isle(self, brans: Brans, kazanan: str) -> dict:
-        """Hükmen galibiyet işle"""
+    def _hukmen_isle(self, brans: Brans, kazanan: str, mesaj_sebebi: str = "") -> dict:
+        """Hükmen galibiyet işle – yalnızca elin tamamen boş olduğu durumda çağrılır"""
         puan = 8
         if kazanan == "kullanici":
             self._kullanici.skor_ekle(puan)
             self._kullanici.galibiyet_kaydet(ozel_yetenek_ile=False)
             self._bilgisayar.maglubiyet_kaydet(brans)
             self._moral_guncelle_seri(self._kullanici, self._bilgisayar)
-            mesaj = f"Hükmen Galibiyet! Bilgisayarın {brans.goster_adi()} kartı kalmadı. (+{puan} puan)"
+            mesaj = f"Hükmen Galibiyet! {mesaj_sebebi}. (+{puan} puan)"
         else:
             self._bilgisayar.skor_ekle(puan)
             self._bilgisayar.galibiyet_kaydet(ozel_yetenek_ile=False)
             self._kullanici.maglubiyet_kaydet(brans)
             self._moral_guncelle_seri(self._bilgisayar, self._kullanici)
-            mesaj = f"Hükmen Mağlubiyet! {brans.goster_adi()} kartınız kalmadı. (Bilgisayar +{puan})"
+            mesaj = f"Hükmen Mağlubiyet! {mesaj_sebebi}. (Bilgisayar +{puan})"
 
         tur_kaydi = {
             "tur_no": self._mevcut_tur_no + 1,
@@ -345,14 +359,14 @@ class OyunYonetici:
 
         # Defender etkisi: rakibin özel yetenek bonusunu yarıya düşür
         if kullanici_kart.ozel_yetenek.tur == "Defender":
-            b_perf["ozel_yetenek_bonusu"] = b_perf["ozel_yetenek_bonusu"] // 2
-            b_perf["final_puan"] -= b_perf["ozel_yetenek_bonusu"] // 2
-            b_perf["final_puan"] = max(0, b_perf["final_puan"])
+            original = b_perf["ozel_yetenek_bonusu"]
+            b_perf["ozel_yetenek_bonusu"] = original // 2
+            b_perf["final_puan"] = max(0, b_perf["final_puan"] - (original - original // 2))
 
         if bilgisayar_kart.ozel_yetenek.tur == "Defender":
-            k_perf["ozel_yetenek_bonusu"] = k_perf["ozel_yetenek_bonusu"] // 2
-            k_perf["final_puan"] -= k_perf["ozel_yetenek_bonusu"] // 2
-            k_perf["final_puan"] = max(0, k_perf["final_puan"])
+            original = k_perf["ozel_yetenek_bonusu"]
+            k_perf["ozel_yetenek_bonusu"] = original // 2
+            k_perf["final_puan"] = max(0, k_perf["final_puan"] - (original - original // 2))
 
         k_final = k_perf["final_puan"]
         b_final = b_perf["final_puan"]
@@ -570,16 +584,20 @@ class OyunYonetici:
         seri = kazanan_oyuncu.galibiyet_serisi
         if seri == 2:
             kazanan_oyuncu.moral_guncelle(10)
+            kazanan_oyuncu.kartlara_moral_uygula(10)
         elif seri >= 3:
             kazanan_oyuncu.moral_guncelle(15)
+            kazanan_oyuncu.kartlara_moral_uygula(15)
 
         k_seri = kaybeden_oyuncu.kaybetme_serisi
         if k_seri >= 2:
             kaybeden_oyuncu.moral_guncelle(-10)
+            kaybeden_oyuncu.kartlara_moral_uygula(-10)
 
         # Aynı branşta arka arkaya 2 mağlubiyet: -5 ek
-        if brans and kaybeden_oyuncu.brans_ust_uste_kayip(brans) >= 2:
+        if brans and kaybeden_oyuncu.brans_ust_uste_kayip(brans) == 2:
             kaybeden_oyuncu.moral_guncelle(-5)
+            kaybeden_oyuncu.kartlara_moral_uygula(-5)
 
     # --- Oyun sonu ---
 

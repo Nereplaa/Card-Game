@@ -152,6 +152,12 @@ class Oyuncu(ABC):
             if kart.brans == brans and kart.sporcu_takim == takim and kart.oynanabilir_mi():
                 kart.moral_guncelle(miktar)
 
+    def kartlara_moral_uygula(self, miktar: int):
+        """Takım morali değiştiğinde tüm oynanabilir kartların moralini güncelle"""
+        for kart in self._kart_listesi:
+            if kart.oynanabilir_mi():
+                kart.moral_guncelle(miktar)
+
     # --- Soyut metot ---
     @abstractmethod
     def kart_sec(self, brans: "Brans", oyun_durumu: dict) -> Optional["Sporcu"]:
